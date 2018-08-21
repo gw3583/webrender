@@ -11,7 +11,7 @@ use clip_scroll_tree::{CoordinateSystemId, SpatialNodeIndex};
 use ellipse::Ellipse;
 use gpu_cache::{GpuCache, GpuCacheHandle, ToGpuBlocks};
 use gpu_types::BoxShadowStretchMode;
-use prim_store::{BrushClipMaskKind, ClipData, ImageMaskData};
+use prim_store::{ClipData, ImageMaskData};
 use render_task::to_cache_size;
 use resource_cache::{ImageRequest, ResourceCache};
 use spatial_node::SpatialNode;
@@ -358,7 +358,6 @@ pub struct ClipChainInstance {
     pub local_clip_rect: LayoutRect,
     pub has_non_root_coord_system: bool,
     pub local_bounding_rect: LayoutRect,
-    pub clip_mask_kind: BrushClipMaskKind,
 }
 
 impl ClipStore {
@@ -550,18 +549,10 @@ impl ClipStore {
 
         let first_clip_node_index = self.clip_node_indices.len() as u32;
         let mut has_non_root_coord_system = false;
-        let mut clip_mask_kind = BrushClipMaskKind::Individual;
 
         // For each potential clip node
         for node_info in self.clip_node_info.drain(..) {
             let node = &mut self.clip_nodes[node_info.node_index.0 as usize];
-
-            // TODO(gw): We can easily extend the segment builder to support these clip sources in
-            // the future, but they are rarely used.
-            // We must do this check here in case we continue early below.
-            if node.item.is_image_or_line_decoration_clip() {
-                clip_mask_kind = BrushClipMaskKind::Global;
-            }
 
             // Convert the prim rect into the clip nodes local space
             let prim_rect = node_info
@@ -608,15 +599,9 @@ impl ClipStore {
                             ClipNodeFlags::SAME_SPATIAL_NODE | ClipNodeFlags::SAME_COORD_SYSTEM
                         }
                         ClipSpaceConversion::Offset(..) => {
-                            if !node.item.is_rect() {
-                                clip_mask_kind = BrushClipMaskKind::Global;
-                            }
                             ClipNodeFlags::SAME_COORD_SYSTEM
                         }
                         ClipSpaceConversion::Transform(..) => {
-                            // If this primitive is clipped by clips from a different coordinate system, then we
-                            // need to apply a clip mask for the entire primitive.
-                            clip_mask_kind = BrushClipMaskKind::Global;
                             ClipNodeFlags::empty()
                         }
                     };
@@ -642,7 +627,6 @@ impl ClipStore {
             has_non_root_coord_system,
             local_clip_rect: current_local_clip_rect,
             local_bounding_rect,
-            clip_mask_kind,
         })
     }
 }
@@ -880,20 +864,6 @@ impl ClipItem {
             _ => {
                 panic!("bug: other clip sources not expected here yet");
             }
-        }
-    }
-
-    pub fn is_rect(&self) -> bool {
-        match *self {
-            ClipItem::Rectangle(..) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_image_or_line_decoration_clip(&self) -> bool {
-        match *self {
-            ClipItem::Image(..) | ClipItem::LineDecoration(..) => true,
-            _ => false,
         }
     }
 
