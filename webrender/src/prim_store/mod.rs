@@ -2573,7 +2573,12 @@ impl PrimitiveStore {
                     frame_context.scene_properties,
                 );
 
-                write_segment(prim_data, *segment_instance_index, frame_state, scratch);
+                write_segment(*segment_instance_index, frame_state, scratch, |request| {
+                    prim_data.kind.write_prim_gpu_blocks(
+                        request,
+                        prim_data.prim_size,
+                    );
+                });
             }
             PrimitiveInstanceKind::YuvImage { data_handle, segment_instance_index, .. } => {
                 let yuv_image_data = &mut resources.yuv_image_data_store[*data_handle];
@@ -2582,29 +2587,9 @@ impl PrimitiveStore {
                 // cache with any shared template data.
                 yuv_image_data.update(frame_state);
 
-                // write_segment(yuv_image_data, *segment_instance_index, frame_state, scratch);
-                debug_assert!(*segment_instance_index != SegmentInstanceIndex::INVALID);
-                if *segment_instance_index != SegmentInstanceIndex::UNUSED {
-                    let segment_instance =
-                        &mut scratch.segment_instances[*segment_instance_index];
-
-                    if let Some(mut request) =
-                        frame_state
-                        .gpu_cache
-                        .request(&mut segment_instance.gpu_cache_handle)
-                    {
-                        let segments = &scratch.segments[segment_instance.segments_range];
-
-                        yuv_image_data.write_prim_gpu_blocks(&mut request);
-
-                        for segment in segments {
-                            request.write_segment(
-                                segment.local_rect,
-                                [0.0; 4],
-                            );
-                        }
-                    }
-                }
+                write_segment(*segment_instance_index, frame_state, scratch, |request| {
+                    yuv_image_data.write_prim_gpu_blocks(request);
+                });
             }
             PrimitiveInstanceKind::Image { data_handle, image_instance_index, .. } => {
                 let image_data = &mut resources.image_data_store[*data_handle];
@@ -2712,28 +2697,9 @@ impl PrimitiveStore {
                     }
                 }
 
-                //write_segment(image_data, image_instance.segment_instance_index, frame_state, scratch);
-                if image_instance.segment_instance_index != SegmentInstanceIndex::UNUSED {
-                    let segment_instance =
-                        &mut scratch.segment_instances[image_instance.segment_instance_index];
-
-                    if let Some(mut request) =
-                        frame_state
-                        .gpu_cache
-                        .request(&mut segment_instance.gpu_cache_handle)
-                    {
-                        let segments = &scratch.segments[segment_instance.segments_range];
-
-                        image_data.write_prim_gpu_blocks(&mut request);
-
-                        for segment in segments {
-                            request.write_segment(
-                                segment.local_rect,
-                                [0.0; 4],
-                            );
-                        }
-                    }
-                }
+                write_segment(image_instance.segment_instance_index, frame_state, scratch, |request| {
+                    image_data.write_prim_gpu_blocks(request);
+                });
             }
             PrimitiveInstanceKind::LinearGradient { data_handle, ref mut visible_tiles_range, .. } => {
                 let prim_data = &mut resources.linear_grad_data_store[*data_handle];
@@ -2824,12 +2790,12 @@ impl PrimitiveStore {
     }
 }
 
-fn write_segment(
-    prim_data: &PrimitiveTemplate,
+fn write_segment<F>(
     segment_instance_index: SegmentInstanceIndex,
     frame_state: &mut FrameBuildingState,
     scratch: &mut PrimitiveScratchBuffer,
-) {
+    f: F,
+) where F: Fn(&mut GpuDataRequest) {
     debug_assert!(segment_instance_index != SegmentInstanceIndex::INVALID);
     if segment_instance_index != SegmentInstanceIndex::UNUSED {
         let segment_instance = &mut scratch.segment_instances[segment_instance_index];
@@ -2837,10 +2803,7 @@ fn write_segment(
         if let Some(mut request) = frame_state.gpu_cache.request(&mut segment_instance.gpu_cache_handle) {
             let segments = &scratch.segments[segment_instance.segments_range];
 
-            prim_data.kind.write_prim_gpu_blocks(
-                &mut request,
-                prim_data.prim_size,
-            );
+            f(&mut request);
 
             for segment in segments {
                 request.write_segment(
