@@ -89,8 +89,8 @@ impl App {
 }
 
 impl Example for App {
-    const WIDTH: u32 = 1024;
-    const HEIGHT: u32 = 1024;
+    const WIDTH: u32 = 2048;
+    const HEIGHT: u32 = 1024 + 512;
 
     fn render(
         &mut self,

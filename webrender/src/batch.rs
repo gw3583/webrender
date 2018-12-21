@@ -978,47 +978,42 @@ impl AlphaBatchBuilder {
                     Some(ref raster_config) => {
                         match raster_config.composite_mode {
                             PictureCompositeMode::TileCache { .. } => {
-                                // !!!!!!!!!!!!!!!
-                                println!("!!!!!!!!!!!!!!! batch");
-                                // panic!("todo");
-
-                                // If this picture is being drawn into an existing target (i.e. with
-                                // no composition operation), recurse and add to the current batch list.
-                                self.add_pic_to_batch(
-                                    picture,
-                                    task_id,
-                                    ctx,
-                                    gpu_cache,
-                                    render_tasks,
-                                    deferred_resolves,
-                                    prim_headers,
-                                    transforms,
-                                    root_spatial_node_index,
-                                    z_generator,
-                                );
-
-                                /*
                                 // Step through each tile in the cache, and draw it with an image
                                 // brush primitive if visible.
+                                let tile_cache = picture.tile_cache.as_ref().unwrap();
 
                                 let kind = BatchKind::Brush(
                                     BrushBatchKind::Image(ImageBufferKind::Texture2DArray)
                                 );
 
-                                let tile_cache = picture.tile_cache.as_ref().unwrap();
+                                if tile_cache.tiles_to_draw.is_empty() {
+                                    println!("     -> draw picture");
 
-                                for y in 0 .. tile_cache.tile_rect.size.height {
-                                    for x in 0 .. tile_cache.tile_rect.size.width {
-                                        let i = y * tile_cache.tile_rect.size.width + x;
-                                        let tile = &tile_cache.tiles[i as usize];
+                                    // If this picture is being drawn into an existing target (i.e. with
+                                    // no composition operation), recurse and add to the current batch list.
+                                    self.add_pic_to_batch(
+                                        picture,
+                                        task_id,
+                                        ctx,
+                                        gpu_cache,
+                                        render_tasks,
+                                        deferred_resolves,
+                                        prim_headers,
+                                        transforms,
+                                        root_spatial_node_index,
+                                        z_generator,
+                                    );
+                                } else {
+                                    println!("     -> draw tiles");
 
-                                        // Check if the tile is visible.
-                                        if !tile.is_visible || !tile.in_use {
-                                            continue;
-                                        }
+                                    for i in &tile_cache.tiles_to_draw {
+                                        let tile = &tile_cache.tiles[*i as usize];
+
+                                        // debug_assert!(tile.is_visible);
+                                        // debug_assert!(tile.in_use);
 
                                         // Get the local rect of the tile.
-                                        let tile_rect = tile_cache.get_tile_rect(x, y);
+                                        let tile_rect = tile.local_rect; //tile_cache.get_tile_rect(x, y);
 
                                         // Construct a local clip rect that ensures we only draw pixels where
                                         // the local bounds of the picture extend to within the edge tiles.
@@ -1048,7 +1043,7 @@ impl AlphaBatchBuilder {
 
                                         let key = BatchKey::new(
                                             kind,
-                                            BlendMode::None,
+                                            BlendMode::PremultipliedAlpha,          // select the right mode here!!!!
                                             BatchTextures::color(cache_item.texture_id),
                                         );
 
@@ -1078,7 +1073,6 @@ impl AlphaBatchBuilder {
                                         batch.push(PrimitiveInstanceData::from(instance));
                                     }
                                 }
-                                */
                             }
                             PictureCompositeMode::Filter(filter) => {
                                 let surface = ctx.surfaces[raster_config.surface_index.0]
