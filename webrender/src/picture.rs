@@ -92,12 +92,12 @@ impl RetainedTiles {
 pub struct TileCache {
     spatial_node_index: SpatialNodeIndex,
     pub tiles: Vec<Tile>,
-    map_local_to_picture: SpaceMapper<LayoutPixel, LayoutPixel>,
+    // map_local_to_picture: SpaceMapper<LayoutPixel, LayoutPixel>,
     map_local_to_world: SpaceMapper<LayoutPixel, WorldPixel>,
-    local_tile_size: LayoutSize,
-    tile_origin: TileOffset,
-    tile_count: TileSize,
-    local_origin: LayoutPoint,
+    // local_tile_size: LayoutSize,
+    // tile_origin: TileOffset,
+    // tile_count: TileSize,
+    // local_origin: LayoutPoint,
     pub tiles_to_draw: Vec<usize>,
     transforms: Vec<GlobalTransformInfo>,
     opacity_bindings: FastHashMap<PropertyBindingId, OpacityBindingInfo>,
@@ -111,18 +111,18 @@ impl TileCache {
         TileCache {
             spatial_node_index,
             tiles: Vec::new(),
-            local_tile_size: LayoutSize::zero(),
-            map_local_to_picture: SpaceMapper::new(
-                ROOT_SPATIAL_NODE_INDEX,
-                LayoutRect::zero(),
-            ),
+            // local_tile_size: LayoutSize::zero(),
+            // map_local_to_picture: SpaceMapper::new(
+            //     ROOT_SPATIAL_NODE_INDEX,
+            //     LayoutRect::zero(),
+            // ),
             map_local_to_world: SpaceMapper::new(
                 ROOT_SPATIAL_NODE_INDEX,
                 WorldRect::zero(),
             ),
-            tile_origin: TileOffset::zero(),
-            tile_count: TileSize::zero(),
-            local_origin: LayoutPoint::zero(),
+            // tile_origin: TileOffset::zero(),
+            // tile_count: TileSize::zero(),
+            // local_origin: LayoutPoint::zero(),
             tiles_to_draw: Vec::new(),
             transforms: Vec::new(),
             opacity_bindings: FastHashMap::default(),
@@ -136,6 +136,8 @@ impl TileCache {
         &self,
         rect: &LayoutRect,
     ) -> (TileOffset, TileOffset) {
+        panic!("todo");
+        /*
         // Translate the rectangle into the virtual tile space
         let origin = rect.origin; // - self.local_origin;
 
@@ -151,6 +153,7 @@ impl TileCache {
         );
 
         (p0, p1)
+        */
     }
 
     pub fn pre_update(
@@ -171,10 +174,10 @@ impl TileCache {
 
         self.tiles_to_draw.clear();
 
-        self.map_local_to_picture = SpaceMapper::new(
-            self.spatial_node_index,
-            pic_rect,
-        );
+        // self.map_local_to_picture = SpaceMapper::new(
+        //     self.spatial_node_index,
+        //     pic_rect,
+        // );
         self.map_local_to_world = SpaceMapper::new(
             ROOT_SPATIAL_NODE_INDEX,
             frame_context.screen_world_rect,
@@ -253,7 +256,7 @@ impl TileCache {
         println!("needed_pic_rect = {:?}", needed_pic_rect);
 
         if self.tiles.is_empty() {
-            self.local_origin = pic_rect.origin.floor();
+            // self.local_origin = pic_rect.origin.floor();
 
             let world_tile_rect = WorldRect::from_floats(
                 0.0,
@@ -264,21 +267,23 @@ impl TileCache {
             let local_tile_rect = world_mapper
                 .unmap(&world_tile_rect)
                 .expect("bug: unable to get local tile size");
-            self.local_tile_size = local_tile_rect.size;
+            // self.local_tile_size = local_tile_rect.size;
 
             // Get the tile coordinates in the picture space.
             let (p0, p1) = self.get_tile_coords_for_rect(&needed_pic_rect);
 
             let x_tiles = p1.x - p0.x;
             let y_tiles = p1.y - p0.y;
-            self.tile_origin = p0;
-            self.tile_count = TileSize::new(x_tiles, y_tiles);
+            // self.tile_origin = p0;
+            // self.tile_count = TileSize::new(x_tiles, y_tiles);
 
             println!("\tp0 = {:?} p1 = {:?}", p0, p1);
             println!("need {}x{} tiles", x_tiles, y_tiles);
 
             // todo: !!!!!!!!!!!!!! only create tiles that are (nearly?) visible
 
+            panic!("todo");
+            /*
             for y in 0 .. y_tiles {
                 for x in 0 .. x_tiles {
                     let local_pos = LayoutPoint::new(
@@ -302,6 +307,7 @@ impl TileCache {
                     self.tiles.push(tile);
                 }
             }
+            */
 
         } else {
             let device_ref_point = self.tiles[0].world_rect.origin * frame_context.device_pixel_scale;
@@ -342,7 +348,8 @@ impl TileCache {
 
             println!("now need {}x{} tiles", x_tiles, y_tiles);
 
-            println!(" -> p0 = {:?}, p1 = {:?} (local_tile_size = {:?})", p0, p1, self.local_tile_size);
+            panic!("todo");
+            //println!(" -> p0 = {:?}, p1 = {:?} (local_tile_size = {:?})", p0, p1, self.local_tile_size);
 
             for y in 0 .. y_tiles {
                 for x in 0 .. x_tiles {
@@ -438,10 +445,10 @@ impl TileCache {
             return;
         }
 
-        self.map_local_to_picture.set_target_spatial_node(
-            prim_instance.spatial_node_index,
-            clip_scroll_tree,
-        );
+        // self.map_local_to_picture.set_target_spatial_node(
+        //     prim_instance.spatial_node_index,
+        //     clip_scroll_tree,
+        // );
         self.map_local_to_world.set_target_spatial_node(
             prim_instance.spatial_node_index,
             clip_scroll_tree,
@@ -476,6 +483,8 @@ impl TileCache {
             None => return,
         };
 
+        panic!("todo");
+        /*
         let rect = match self.map_local_to_picture.map(&culling_rect) {
             Some(rect) => rect,
             None => {
@@ -615,6 +624,7 @@ impl TileCache {
                 tile.descriptor.clip_uids.extend_from_slice(&clip_chain_uids);
             }
         }
+        */
     }
 
     pub fn post_update(
