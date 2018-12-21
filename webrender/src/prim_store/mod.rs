@@ -1673,6 +1673,9 @@ impl PrimitiveStore {
         gpu_cache: &mut GpuCache,
         retained_tiles: &mut RetainedTiles,
     ) {
+        println!("!!!!!!!! update_tile_cache");
+        // panic!("todo");
+        /*
         let children = {
             let pic = &mut self.pictures[pic_index.0];
             // Only update the tile cache if we ended up selecting tile caching for the
@@ -1747,6 +1750,7 @@ impl PrimitiveStore {
             pic.tile_cache = Some(tile_cache);
         }
         pic.prim_list.pictures = children;
+        */
     }
 
     pub fn get_opacity_binding(
@@ -1904,6 +1908,7 @@ impl PrimitiveStore {
                         pic_context.allow_subpixel_aa,
                         frame_state,
                         frame_context,
+                        pic_context.dirty_world_rect,
                     ) {
                         Some(info) => Some(info),
                         None => {

@@ -978,7 +978,26 @@ impl AlphaBatchBuilder {
                     Some(ref raster_config) => {
                         match raster_config.composite_mode {
                             PictureCompositeMode::TileCache { .. } => {
+                                // !!!!!!!!!!!!!!!
+                                println!("!!!!!!!!!!!!!!! batch");
+                                // panic!("todo");
 
+                                // If this picture is being drawn into an existing target (i.e. with
+                                // no composition operation), recurse and add to the current batch list.
+                                self.add_pic_to_batch(
+                                    picture,
+                                    task_id,
+                                    ctx,
+                                    gpu_cache,
+                                    render_tasks,
+                                    deferred_resolves,
+                                    prim_headers,
+                                    transforms,
+                                    root_spatial_node_index,
+                                    z_generator,
+                                );
+
+                                /*
                                 // Step through each tile in the cache, and draw it with an image
                                 // brush primitive if visible.
 
@@ -1059,6 +1078,7 @@ impl AlphaBatchBuilder {
                                         batch.push(PrimitiveInstanceData::from(instance));
                                     }
                                 }
+                                */
                             }
                             PictureCompositeMode::Filter(filter) => {
                                 let surface = ctx.surfaces[raster_config.surface_index.0]

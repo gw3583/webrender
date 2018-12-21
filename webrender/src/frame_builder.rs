@@ -298,8 +298,9 @@ impl FrameBuilder {
         // up by the new frame, then just discard them eagerly.
         // TODO(gw): Maybe it's worth keeping them around for a bit longer in
         //           some cases?
-        for (_, handle) in retained_tiles.tiles.drain() {
-            resource_cache.texture_cache.mark_unused(&handle);
+        for _ in retained_tiles.tiles.drain(..) {
+            panic!("todo");
+            // resource_cache.texture_cache.mark_unused(&handle);
         }
 
         let mut frame_state = FrameBuildingState {
@@ -325,6 +326,7 @@ impl FrameBuilder {
                 true,
                 &mut frame_state,
                 &frame_context,
+                screen_world_rect,
             )
             .unwrap();
 

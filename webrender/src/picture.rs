@@ -53,6 +53,42 @@ struct PictureInfo {
     spatial_node_index: SpatialNodeIndex,
 }
 
+pub struct Tile {
+}
+
+pub struct RetainedTiles {
+    pub tiles: Vec<Tile>,
+}
+
+impl RetainedTiles {
+    pub fn new() -> Self {
+        RetainedTiles {
+            tiles: Vec::new(),
+        }
+    }
+}
+
+pub struct TileCache {
+}
+
+impl TileCache {
+    pub fn new() -> Self {
+        TileCache {
+        }
+    }
+}
+
+pub struct TileCacheUpdateState {
+}
+
+impl TileCacheUpdateState {
+    pub fn new() -> Self {
+        TileCacheUpdateState {
+        }
+    }
+}
+
+/*
 /// Stores a map of cached picture tiles that are retained
 /// between new scenes.
 pub struct RetainedTiles {
@@ -1072,6 +1108,7 @@ impl TileCacheUpdateState {
         }
     }
 }
+*/
 
 /// Maintains a stack of picture and surface information, that
 /// is used during the initial picture traversal.
@@ -1592,6 +1629,8 @@ impl PicturePrimitive {
         retained_tiles: &mut RetainedTiles,
     ) {
         if let Some(tile_cache) = self.tile_cache.take() {
+            println!("!!!!!!! destroy");
+            /*
             debug_assert!(tile_cache.old_tiles.is_empty());
             for tile in tile_cache.tiles {
                 if let Some((descriptor, handle)) = tile.destroy() {
@@ -1601,6 +1640,7 @@ impl PicturePrimitive {
                     );
                 }
             }
+            */
         }
     }
 
@@ -1677,6 +1717,7 @@ impl PicturePrimitive {
         parent_allows_subpixel_aa: bool,
         frame_state: &mut FrameBuildingState,
         frame_context: &FrameBuildingContext,
+        dirty_world_rect: WorldRect,
     ) -> Option<(PictureContext, PictureState, PrimitiveList)> {
         if !self.is_visible() {
             return None;
@@ -1685,6 +1726,11 @@ impl PicturePrimitive {
         // Work out the dirty world rect for this picture.
         let dirty_world_rect = match self.tile_cache {
             Some(ref tile_cache) => {
+                // !!!!!!!!!!!!!!!!!!!!!!
+                dirty_world_rect
+
+                // panic!("todo");
+                /*
                 // If a tile cache is present, extract the dirty
                 // world rect from the dirty region. If there is
                 // no dirty region there is nothing to render.
@@ -1695,10 +1741,11 @@ impl PicturePrimitive {
                     .map_or(WorldRect::zero(), |region| {
                         region.dirty_world_rect
                     })
+                    */
             }
             None => {
-                // No tile cache - just assume the world rect of the screen.
-                frame_context.screen_world_rect
+                // No tile cache - just assume the current dirty world rect.
+                dirty_world_rect
             }
         };
 
@@ -2046,6 +2093,8 @@ impl PicturePrimitive {
         opacity_binding_store: &OpacityBindingStorage,
         image_instances: &ImageInstanceStorage,
     ) {
+        panic!("todo");
+        /*
         for prim_instance in &self.prim_list.prim_instances {
             tile_cache.update_prim_dependencies(
                 prim_instance,
@@ -2060,6 +2109,7 @@ impl PicturePrimitive {
                 image_instances,
             );
         }
+        */
     }
 
     /// Called after updating child pictures during the initial
@@ -2161,6 +2211,12 @@ impl PicturePrimitive {
             // is not ideal (we could skip the surface altogether in the future)
             // but it's simple and works around this edge case for now.
             if let Some(ref mut tile_cache) = self.tile_cache {
+                // !!!!!!!!!!!!!!!!
+                // Doesn't this new plan mean we're only retaining tiles for
+                // aprox the display port (the visible screen + a few extras)?
+                // If so, this is no longer an issue anyway????
+                // panic!("todo");
+                /*
                 if surface_rect.size.width > MAX_PICTURE_SIZE ||
                    surface_rect.size.height > MAX_PICTURE_SIZE ||
                    surface_rect.size.width <= 0.0 ||
@@ -2171,6 +2227,7 @@ impl PicturePrimitive {
                     tile_cache.tile_rect = TileRect::zero();
                     raster_config.composite_mode = PictureCompositeMode::Blit;
                 }
+                */
             }
 
             let mut surface_rect = TypedRect::from_untyped(&surface_rect.to_untyped());
@@ -2278,6 +2335,13 @@ impl PicturePrimitive {
 
         let surface = match raster_config.composite_mode {
             PictureCompositeMode::TileCache { clear_color, .. } => {
+                println!("!!!!!!! prepare_for_render");
+
+                surfaces[surface_index.0].tasks.extend(child_tasks);
+                return true;
+
+                // panic!("todo");
+                /*
                 let tile_cache = self.tile_cache.as_mut().unwrap();
 
                 // Build the render task for a tile cache picture, if there is
@@ -2395,6 +2459,7 @@ impl PicturePrimitive {
                         return true;
                     }
                 }
+                */
             }
             PictureCompositeMode::Filter(FilterOp::Blur(blur_radius)) => {
                 let blur_std_deviation = blur_radius * frame_context.device_pixel_scale.0;
@@ -2842,6 +2907,7 @@ fn create_raster_mappers(
 // Check whether a relative transform between two spatial nodes has changed
 // since last frame. If that relative transform hasn't been calculated, then
 // do that now and store it for later use.
+/*
 fn get_global_transform_changed(
     global_transforms: &mut [GlobalTransformInfo],
     spatial_node_index: SpatialNodeIndex,
@@ -2863,3 +2929,4 @@ fn get_global_transform_changed(
 
     transform.changed
 }
+*/
