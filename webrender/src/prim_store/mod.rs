@@ -1684,6 +1684,75 @@ impl PrimitiveStore {
                 debug_assert!(state.tile_cache.is_none());
                 let mut tile_cache = pic.tile_cache.take().unwrap();
 
+                // If we have a tile cache for this picture, see if any of the
+                // relative transforms have changed, which means we need to
+                // re-map the dependencies of any child primitives.
+                tile_cache.pre_update(
+                    pic.local_rect,
+                    frame_context,
+                    resource_cache,
+                    retained_tiles,
+                );
+
+                state.tile_cache = Some(tile_cache);
+            }
+            mem::replace(&mut pic.prim_list.pictures, SmallVec::new())
+        };
+
+        if let Some(ref mut tile_cache) = state.tile_cache {
+            self.pictures[pic_index.0].update_prim_dependencies(
+                tile_cache,
+                frame_context,
+                resource_cache,
+                resources,
+                &self.pictures,
+                clip_store,
+                &self.opacity_bindings,
+                &self.images,
+            );
+        }
+
+        for child_pic_index in &children {
+            self.update_tile_cache(
+                *child_pic_index,
+                state,
+                frame_context,
+                resource_cache,
+                resources,
+                clip_store,
+                surfaces,
+                gpu_cache,
+                retained_tiles,
+            );
+        }
+
+        let pic = &mut self.pictures[pic_index.0];
+        if let Some(RasterConfig { composite_mode: PictureCompositeMode::TileCache { .. }, .. }) = pic.raster_config {
+            let mut tile_cache = state.tile_cache.take().unwrap();
+
+            // Build the dirty region(s) for this tile cache.
+            tile_cache.post_update(
+                resource_cache,
+                gpu_cache,
+            );
+
+            pic.tile_cache = Some(tile_cache);
+        }
+
+        pic.prim_list.pictures = children;
+
+        /*
+        let children = {
+            let pic = &mut self.pictures[pic_index.0];
+            // Only update the tile cache if we ended up selecting tile caching for the
+            // composite mode of this picture. In some cases, even if the requested
+            // composite mode was tile caching, WR may choose not to draw this picture
+            // with tile cache enabled. For now, this is only in the case of very large
+            // picture rects, but in future we may do it for performance reasons too.
+            if let Some(RasterConfig { composite_mode: PictureCompositeMode::TileCache { .. }, .. }) = pic.raster_config {
+                debug_assert!(state.tile_cache.is_none());
+                let mut tile_cache = pic.tile_cache.take().unwrap();
+
                 let surface_index = pic.raster_config.as_ref().unwrap().surface_index;
                 let surface = &surfaces[surface_index.0];
 
@@ -1747,6 +1816,7 @@ impl PrimitiveStore {
             pic.tile_cache = Some(tile_cache);
         }
         pic.prim_list.pictures = children;
+        */
     }
 
     pub fn get_opacity_binding(
@@ -1904,6 +1974,7 @@ impl PrimitiveStore {
                         pic_context.allow_subpixel_aa,
                         frame_state,
                         frame_context,
+                        pic_context.dirty_world_rect,
                     ) {
                         Some(info) => Some(info),
                         None => {
