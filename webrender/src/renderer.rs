@@ -3485,6 +3485,8 @@ impl Renderer {
             self.device.bind_read_target(draw_target.into());
 
             for blit in &target.tile_blits {
+                // println!("do tile blit s={:?} d={:?} s={:?} (of {})", blit.src_offset, blit.dest_offset, blit.size, target.tile_blits.len());
+
                 let texture = self.texture_resolver
                     .resolve(&blit.target.texture_id)
                     .expect("BUG: invalid target texture");
@@ -3495,19 +3497,36 @@ impl Renderer {
                     with_depth: false,
                 });
 
-                let src_rect = DeviceIntRect::new(
-                    blit.offset,
-                    blit.target.uv_rect.size.to_i32(),
+                let mut src_rect = DeviceIntRect::new(
+                    blit.src_offset,
+                    blit.size,
                 );
 
-                let dest_rect = blit.target.uv_rect.to_i32();
+                let target_rect = blit.target.uv_rect.to_i32();
+
+                let mut dest_rect = DeviceIntRect::new(
+                    DeviceIntPoint::new(
+                        blit.dest_offset.x + target_rect.origin.x,
+                        blit.dest_offset.y + target_rect.origin.y,
+                    ),
+                    blit.size,
+                );
+
+                // fb hack
+                src_rect.origin.y = draw_target.dimensions().height as i32 - src_rect.size.height - src_rect.origin.y;
+                dest_rect.origin.y += dest_rect.size.height;
+                dest_rect.size.height = -dest_rect.size.height;
+                // src_rect.origin.y = draw_target.dimensions().height as i32 - src_rect.origin.y - src_rect.size.height;
 
                 self.device.blit_render_target(
                     src_rect,
                     dest_rect,
                 );
             }
+
+            self.device.bind_draw_target(draw_target);
         }
+
     }
 
     fn draw_alpha_target(
@@ -4182,6 +4201,13 @@ impl Renderer {
         #[cfg(feature = "debug_renderer")]
         {
             if let Some(framebuffer_size) = framebuffer_size {
+
+                if let Some(debug_renderer) = self.debug.get_mut(&mut self.device) {
+                    for debug_rect in &frame.debug_rects {
+                        debug_renderer.add_rect(debug_rect, ColorU::new(0, 255, 0, 255));
+                    }
+                }
+
                 self.draw_render_target_debug(framebuffer_size);
                 self.draw_texture_cache_debug(framebuffer_size);
                 self.draw_gpu_cache_debug(framebuffer_size);

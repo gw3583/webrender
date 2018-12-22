@@ -218,6 +218,7 @@ impl FrameBuilder {
         resources: &mut FrameResources,
         surfaces: &mut Vec<SurfaceInfo>,
         scratch: &mut PrimitiveScratchBuffer,
+        debug_rects: &mut Vec<DeviceIntRect>,
     ) -> Option<RenderTaskId> {
         profile_scope!("cull");
 
@@ -292,14 +293,16 @@ impl FrameBuilder {
             &pic_update_state.surfaces,
             gpu_cache,
             &mut retained_tiles,
+            debug_rects,
         );
 
         // If we had any retained tiles from the last scene that were not picked
         // up by the new frame, then just discard them eagerly.
         // TODO(gw): Maybe it's worth keeping them around for a bit longer in
         //           some cases?
-        for (_, handle) in retained_tiles.tiles.drain() {
-            resource_cache.texture_cache.mark_unused(&handle);
+        for _ in retained_tiles.tiles.drain(..) {
+            panic!("todo");
+            // resource_cache.texture_cache.mark_unused(&handle);
         }
 
         let mut frame_state = FrameBuildingState {
@@ -325,6 +328,7 @@ impl FrameBuilder {
                 true,
                 &mut frame_state,
                 &frame_context,
+                screen_world_rect,
             )
             .unwrap();
 
@@ -350,6 +354,11 @@ impl FrameBuilder {
             .surfaces[ROOT_SURFACE_INDEX.0]
             .take_render_tasks();
 
+        let tile_blits = mem::replace(
+            &mut frame_state.surfaces[ROOT_SURFACE_INDEX.0].tile_blits,
+            Vec::new(),
+        );
+
         let root_render_task = RenderTask::new_picture(
             RenderTaskLocation::Fixed(self.screen_rect.to_i32()),
             self.screen_rect.size.to_f32(),
@@ -359,7 +368,7 @@ impl FrameBuilder {
             UvRectKind::Rect,
             root_spatial_node_index,
             None,
-            Vec::new(),
+            tile_blits,
         );
 
         let render_task_id = frame_state.render_tasks.add(root_render_task);
@@ -414,6 +423,7 @@ impl FrameBuilder {
 
         let screen_size = self.screen_rect.size.to_i32();
         let mut special_render_passes = SpecialRenderPasses::new(&screen_size);
+        let mut debug_rects = Vec::new();
 
         let main_render_task_id = self.build_layer_screen_rects_and_cull_layers(
             clip_scroll_tree,
@@ -429,6 +439,7 @@ impl FrameBuilder {
             resources,
             &mut surfaces,
             scratch,
+            &mut debug_rects,
         );
 
         resource_cache.block_until_all_resources_added(gpu_cache,
@@ -517,6 +528,7 @@ impl FrameBuilder {
             has_been_rendered: false,
             has_texture_cache_tasks,
             prim_headers,
+            debug_rects,
         }
     }
 
