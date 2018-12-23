@@ -978,86 +978,101 @@ impl AlphaBatchBuilder {
                     Some(ref raster_config) => {
                         match raster_config.composite_mode {
                             PictureCompositeMode::TileCache { .. } => {
-
                                 // Step through each tile in the cache, and draw it with an image
                                 // brush primitive if visible.
+                                let tile_cache = picture.tile_cache.as_ref().unwrap();
 
                                 let kind = BatchKind::Brush(
                                     BrushBatchKind::Image(ImageBufferKind::Texture2DArray)
                                 );
 
-                                let tile_cache = picture.tile_cache.as_ref().unwrap();
+                                if let Some(_) = tile_cache.dirty_region {
+                                    // println!("     -> draw picture (dirty_region = {:?})", dirty_region);
 
-                                for y in 0 .. tile_cache.tile_rect.size.height {
-                                    for x in 0 .. tile_cache.tile_rect.size.width {
-                                        let i = y * tile_cache.tile_rect.size.width + x;
-                                        let tile = &tile_cache.tiles[i as usize];
+                                    // If this picture is being drawn into an existing target (i.e. with
+                                    // no composition operation), recurse and add to the current batch list.
+                                    self.add_pic_to_batch(
+                                        picture,
+                                        task_id,
+                                        ctx,
+                                        gpu_cache,
+                                        render_tasks,
+                                        deferred_resolves,
+                                        prim_headers,
+                                        transforms,
+                                        root_spatial_node_index,
+                                        z_generator,
+                                    );
+                                }
 
-                                        // Check if the tile is visible.
-                                        if !tile.is_visible || !tile.in_use {
-                                            continue;
-                                        }
+                                // println!("     -> draw {} tiles", tile_cache.tiles_to_draw.len());
+                                let tile_zid = z_generator.next();
 
-                                        // Get the local rect of the tile.
-                                        let tile_rect = tile_cache.get_tile_rect(x, y);
+                                for i in &tile_cache.tiles_to_draw {
+                                    let tile = &tile_cache.tiles[*i as usize];
 
-                                        // Construct a local clip rect that ensures we only draw pixels where
-                                        // the local bounds of the picture extend to within the edge tiles.
-                                        let local_clip_rect = prim_instance
-                                            .combined_local_clip_rect
-                                            .intersection(&picture.local_rect)
-                                            .expect("bug: invalid picture local rect");
+                                    // debug_assert!(tile.is_visible);
+                                    // debug_assert!(tile.in_use);
 
-                                        let prim_header = PrimitiveHeader {
-                                            local_rect: tile_rect,
-                                            local_clip_rect,
-                                            task_address,
-                                            specific_prim_address: prim_cache_address,
-                                            clip_task_address,
-                                            transform_id,
-                                        };
+                                    // Get the local rect of the tile.
+                                    let tile_rect = tile.local_rect; //tile_cache.get_tile_rect(x, y);
 
-                                        let prim_header_index = prim_headers.push(&prim_header, z_id, [
-                                            ShaderColorMode::Image as i32 | ((AlphaType::PremultipliedAlpha as i32) << 16),
-                                            RasterizationSpace::Local as i32,
-                                            get_shader_opacity(1.0),
-                                        ]);
+                                    // Construct a local clip rect that ensures we only draw pixels where
+                                    // the local bounds of the picture extend to within the edge tiles.
+                                    let local_clip_rect = prim_instance
+                                        .combined_local_clip_rect
+                                        .intersection(&picture.local_rect)
+                                        .expect("bug: invalid picture local rect");
 
-                                        let cache_item = ctx
-                                            .resource_cache
-                                            .get_texture_cache_item(&tile.handle);
+                                    let prim_header = PrimitiveHeader {
+                                        local_rect: tile_rect,
+                                        local_clip_rect,
+                                        task_address,
+                                        specific_prim_address: prim_cache_address,
+                                        clip_task_address,
+                                        transform_id,
+                                    };
 
-                                        let key = BatchKey::new(
-                                            kind,
-                                            BlendMode::None,
-                                            BatchTextures::color(cache_item.texture_id),
-                                        );
+                                    let prim_header_index = prim_headers.push(&prim_header, tile_zid, [
+                                        ShaderColorMode::Image as i32 | ((AlphaType::PremultipliedAlpha as i32) << 16),
+                                        RasterizationSpace::Local as i32,
+                                        get_shader_opacity(1.0),
+                                    ]);
 
-                                        let uv_rect_address = gpu_cache
-                                            .get_address(&cache_item.uv_rect_handle)
-                                            .as_int();
+                                    let cache_item = ctx
+                                        .resource_cache
+                                        .get_texture_cache_item(&tile.handle);
 
-                                        let instance = BrushInstance {
-                                            prim_header_index,
-                                            clip_task_address,
-                                            segment_index: INVALID_SEGMENT_INDEX,
-                                            edge_flags: EdgeAaSegmentMask::empty(),
-                                            brush_flags: BrushFlags::empty(),
-                                            user_data: uv_rect_address,
-                                        };
+                                    let key = BatchKey::new(
+                                        kind,
+                                        BlendMode::None,          // select the right mode here!!!!
+                                        BatchTextures::color(cache_item.texture_id),
+                                    );
 
-                                        // Instead of retrieving the batch once and adding each tile instance,
-                                        // use this API to get an appropriate batch for each tile, since
-                                        // the batch textures may be different. The batch list internally
-                                        // caches the current batch if the key hasn't changed.
-                                        let batch = self.batch_list.set_params_and_get_batch(
-                                            key,
-                                            bounding_rect,
-                                            z_id,
-                                        );
+                                    let uv_rect_address = gpu_cache
+                                        .get_address(&cache_item.uv_rect_handle)
+                                        .as_int();
 
-                                        batch.push(PrimitiveInstanceData::from(instance));
-                                    }
+                                    let instance = BrushInstance {
+                                        prim_header_index,
+                                        clip_task_address,
+                                        segment_index: INVALID_SEGMENT_INDEX,
+                                        edge_flags: EdgeAaSegmentMask::empty(),
+                                        brush_flags: BrushFlags::empty(),
+                                        user_data: uv_rect_address,
+                                    };
+
+                                    // Instead of retrieving the batch once and adding each tile instance,
+                                    // use this API to get an appropriate batch for each tile, since
+                                    // the batch textures may be different. The batch list internally
+                                    // caches the current batch if the key hasn't changed.
+                                    let batch = self.batch_list.set_params_and_get_batch(
+                                        key,
+                                        bounding_rect,
+                                        tile_zid,
+                                    );
+
+                                    batch.push(PrimitiveInstanceData::from(instance));
                                 }
                             }
                             PictureCompositeMode::Filter(filter) => {
