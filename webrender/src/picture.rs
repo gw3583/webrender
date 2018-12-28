@@ -207,7 +207,8 @@ impl TileDescriptor {
 /// regions.
 #[derive(Debug)]
 pub struct DirtyRegion {
-    dirty_world_rect: WorldRect,
+    pub dirty_world_rect: WorldRect,
+    pub dirty_device_rect: DeviceIntRect,
 }
 
 /// Represents a cache of tiles that make up a picture primitives.
@@ -244,7 +245,7 @@ pub struct TileCache {
     /// a new scene arrives.
     scroll_offset: Option<WorldVector2D>,
     /// A list of blits from the framebuffer to be applied during this frame.
-    pending_blits: Vec<TileBlit>,
+    pub pending_blits: Vec<TileBlit>,
     /// Collects the clips that apply to this surface.
     clip_node_collector: ClipNodeCollector,
 }
@@ -752,6 +753,9 @@ impl TileCache {
     ) {
         let mut dirty_world_rect = WorldRect::zero();
 
+        self.dirty_region = None;
+        self.pending_blits.clear();
+
         let descriptor = ImageDescriptor::new(
             TILE_SIZE_WIDTH,
             TILE_SIZE_HEIGHT,
@@ -872,8 +876,10 @@ impl TileCache {
         self.dirty_region = if dirty_world_rect.is_empty() {
             None
         } else {
+            let dirty_device_rect = (dirty_world_rect * frame_context.device_pixel_scale).round().to_i32();
             Some(DirtyRegion {
                 dirty_world_rect,
+                dirty_device_rect,
             })
         };
     }
@@ -987,8 +993,6 @@ pub struct SurfaceInfo {
     pub tasks: Vec<RenderTaskId>,
     /// How much the local surface rect should be inflated (for blur radii).
     pub inflation_factor: f32,
-    /// A list of tile blits to be done after drawing this surface.
-    pub tile_blits: Vec<TileBlit>,
 }
 
 impl SurfaceInfo {
@@ -1023,7 +1027,6 @@ impl SurfaceInfo {
             surface_spatial_node_index,
             tasks: Vec::new(),
             inflation_factor,
-            tile_blits: Vec::new(),
         }
     }
 
@@ -2074,13 +2077,10 @@ impl PicturePrimitive {
 
         let surface = match raster_config.composite_mode {
             PictureCompositeMode::TileCache { .. } => {
-                let tile_cache = self.tile_cache.as_mut().unwrap();
-
                 // For a picture surface, just push any child tasks and tile
                 // blits up to the parent surface.
                 let surface = &mut surfaces[surface_index.0];
                 surface.tasks.extend(child_tasks);
-                surface.tile_blits.extend(tile_cache.pending_blits.drain(..));
 
                 return true;
             }
@@ -2145,7 +2145,6 @@ impl PicturePrimitive {
                         uv_rect_kind,
                         pic_context.raster_spatial_node_index,
                         None,
-                        Vec::new(),
                     );
 
                     let picture_task_id = frame_state.render_tasks.add(picture_task);
@@ -2203,7 +2202,6 @@ impl PicturePrimitive {
                                 uv_rect_kind,
                                 pic_context.raster_spatial_node_index,
                                 None,
-                                Vec::new(),
                             );
 
                             let picture_task_id = render_tasks.add(picture_task);
@@ -2261,7 +2259,6 @@ impl PicturePrimitive {
                     uv_rect_kind,
                     pic_context.raster_spatial_node_index,
                     None,
-                    Vec::new(),
                 );
                 picture_task.mark_for_saving();
 
@@ -2328,7 +2325,6 @@ impl PicturePrimitive {
                     uv_rect_kind,
                     pic_context.raster_spatial_node_index,
                     None,
-                    Vec::new(),
                 );
 
                 let readback_task_id = frame_state.render_tasks.add(
@@ -2368,7 +2364,6 @@ impl PicturePrimitive {
                     uv_rect_kind,
                     pic_context.raster_spatial_node_index,
                     None,
-                    Vec::new(),
                 );
 
                 let render_task_id = frame_state.render_tasks.add(picture_task);
@@ -2400,7 +2395,6 @@ impl PicturePrimitive {
                     uv_rect_kind,
                     pic_context.raster_spatial_node_index,
                     None,
-                    Vec::new(),
                 );
 
                 let render_task_id = frame_state.render_tasks.add(picture_task);
