@@ -503,8 +503,9 @@ impl AlphaBatchBuilder {
     }
 
     fn can_merge(&self) -> bool {
-        self.scissor_rect.is_none() &&
-        self.batch_lists.len() == 1
+        false
+        // self.scissor_rect.is_none() &&
+        // self.batch_lists.len() == 1
     }
 
     pub fn build(
@@ -1052,59 +1053,6 @@ impl AlphaBatchBuilder {
 
                                 let tile_cache = picture.tile_cache.as_ref().unwrap();
 
-                                // If there is a dirty rect for the tile cache, recurse into the
-                                // main picture primitive list, and draw them first.
-                                if let Some(ref dirty_region) = tile_cache.dirty_region {
-                                    let mut tile_blits = Vec::new();
-
-                                    let (target_rect, _) = render_tasks[task_id].get_target_rect();
-
-                                    for blit in &tile_cache.pending_blits {
-                                        tile_blits.push(TileBlit {
-                                            dest_offset: blit.dest_offset,
-                                            size: blit.size,
-                                            target: blit.target.clone(),
-                                            src_offset: DeviceIntPoint::new(
-                                                blit.src_offset.x + target_rect.origin.x,
-                                                blit.src_offset.y + target_rect.origin.y,
-                                            ),
-                                        })
-                                    }
-
-                                    self.push_new_batch_list(
-                                        Some(dirty_region.dirty_device_rect),
-                                        tile_blits,
-                                    );
-
-                                    self.add_pic_to_batch(
-                                        picture,
-                                        task_id,
-                                        ctx,
-                                        gpu_cache,
-                                        render_tasks,
-                                        deferred_resolves,
-                                        prim_headers,
-                                        transforms,
-                                        root_spatial_node_index,
-                                        z_generator,
-                                    );
-
-                                    self.push_new_batch_list(
-                                        None,
-                                        Vec::new(),
-                                    );
-                                }
-
-                                // After drawing the dirty rect, now draw any of the valid tiles that
-                                // will make up the rest of the scene.
-
-                                // Generate a new z id for the tiles, that will place them *after*
-                                // any opaque overdraw from the dirty rect above.
-                                // TODO(gw): We should remove this hack, and also remove some
-                                //           (potential opaque) overdraw by adding support for
-                                //           setting a scissor rect for the dirty rect above.
-                                let tile_zid = z_generator.next();
-
                                 for tile_index in &tile_cache.tiles_to_draw {
                                     let tile = &tile_cache.tiles[tile_index.0];
 
@@ -1127,7 +1075,7 @@ impl AlphaBatchBuilder {
                                         transform_id,
                                     };
 
-                                    let prim_header_index = prim_headers.push(&prim_header, tile_zid, [
+                                    let prim_header_index = prim_headers.push(&prim_header, z_id, [
                                         ShaderColorMode::Image as i32 | ((AlphaType::PremultipliedAlpha as i32) << 16),
                                         RasterizationSpace::Local as i32,
                                         get_shader_opacity(1.0),
@@ -1163,10 +1111,55 @@ impl AlphaBatchBuilder {
                                     let batch = self.current_batch_list().set_params_and_get_batch(
                                         key,
                                         bounding_rect,
-                                        tile_zid,
+                                        z_id,
                                     );
 
                                     batch.push(PrimitiveInstanceData::from(instance));
+                                }
+
+                                // If there is a dirty rect for the tile cache, recurse into the
+                                // main picture primitive list, and draw them first.
+                                if let Some(ref dirty_region) = tile_cache.dirty_region {
+                                    let mut tile_blits = Vec::new();
+
+                                    let (target_rect, _) = render_tasks[task_id].get_target_rect();
+
+                                    for blit in &tile_cache.pending_blits {
+                                        tile_blits.push(TileBlit {
+                                            dest_offset: blit.dest_offset,
+                                            size: blit.size,
+                                            target: blit.target.clone(),
+                                            src_offset: DeviceIntPoint::new(
+                                                blit.src_offset.x + target_rect.origin.x,
+                                                blit.src_offset.y + target_rect.origin.y,
+                                            ),
+                                        })
+                                    }
+
+                                    // println!("dirty = {:?}", dirty_region.dirty_device_rect);
+
+                                    self.push_new_batch_list(
+                                        Some(dirty_region.dirty_device_rect),
+                                        tile_blits,
+                                    );
+
+                                    self.add_pic_to_batch(
+                                        picture,
+                                        task_id,
+                                        ctx,
+                                        gpu_cache,
+                                        render_tasks,
+                                        deferred_resolves,
+                                        prim_headers,
+                                        transforms,
+                                        root_spatial_node_index,
+                                        z_generator,
+                                    );
+
+                                    self.push_new_batch_list(
+                                        None,
+                                        Vec::new(),
+                                    );
                                 }
                             }
                             PictureCompositeMode::Filter(filter) => {

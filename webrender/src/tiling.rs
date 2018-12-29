@@ -425,6 +425,16 @@ impl RenderTarget for ColorRenderTarget {
                         z_generator,
                     );
 
+                    println!("add pic t={:?} b={:?}", target_rect, batch_builder.batch_lists.len());
+                    for (i, bl) in batch_builder.batch_lists.iter().enumerate() {
+                        println!("\t{}: o={:?} a={:?} tb={}",
+                            i,
+                            bl.opaque_batch_list.batches.len(),
+                            bl.alpha_batch_list.batches.len(),
+                            bl.tile_blits.len(),
+                        );
+                    }
+
                     batch_builder.build(
                         &mut self.alpha_batch_containers,
                         &mut merged_batches,
@@ -437,6 +447,7 @@ impl RenderTarget for ColorRenderTarget {
         }
 
         if !merged_batches.is_empty() {
+            print!("push merged batchs!!!");
             self.alpha_batch_containers.push(merged_batches);
         }
     }

@@ -1,0 +1,34 @@
+# a drop-shadow in an iframe causes the content to not render
+---
+root:
+  items:
+    -
+      type: "rect"
+      color: [255, 0, 0, 1]
+      bounds: [0, 0, 500, 100]
+    - text: "Before frame"
+      origin: 20 30
+      size: 20
+    -
+      type: iframe
+      id: [1, 2]
+      bounds: [0, 100, 500, 100]
+    -
+      type: "rect"
+      color: [0, 0, 255, 0.5]
+      bounds: [0, 0, 500, 100]
+    - text: "Outside frame"
+      origin: 20 30
+      size: 20
+
+pipelines:
+  -
+    id: [1, 2]
+    items:
+      -
+        type: "rect"
+        color: [0, 255, 0, 0.5]
+        bounds: [0, 0, 500, 100]
+      - text: "Inside frame"
+        origin: 20 30
+        size: 20

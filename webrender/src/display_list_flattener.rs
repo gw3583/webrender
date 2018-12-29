@@ -233,9 +233,9 @@ impl<'a> DisplayListFlattener<'a> {
         &mut self,
         primitives: &mut Vec<PrimitiveInstance>,
     ) {
-        if !self.config.enable_picture_caching {
-            return;
-        }
+        // if !self.config.enable_picture_caching {
+        //     return;
+        // }
 
         // This method is basically a hack to set up picture caching in a minimal
         // way without having to check the public API (yet). The intent is to
