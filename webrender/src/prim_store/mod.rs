@@ -3248,6 +3248,10 @@ pub fn get_raster_rects(
         device_pixel_scale,
     );
 
+    if clipped.is_empty() {
+        return None;
+    }
+
     Some((clipped.to_i32(), unclipped))
 }
 
